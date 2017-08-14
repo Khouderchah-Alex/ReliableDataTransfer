@@ -1,0 +1,31 @@
+CC      = g++
+CCFLAGS = -g -ggdb -std=c++0x
+LDFLAGS =
+PROJECT = Project2
+
+RDP_SOURCE = rdp.cpp
+
+SERVER_SOURCE = server.cpp $(RDP_SOURCE)
+SERVER_TARGET = server
+
+CLIENT_SOURCE = client.cpp $(RDP_SOURCE)
+CLIENT_TARGET = client
+
+SOURCES = $(SERVER_SOURCE) $(CLIENT_SOURCE)
+TARGETS = $(SERVER_TARGET) $(CLIENT_TARGET)
+
+PACKAGE_NAME   = $(PROJECT)-Group7.tar.gz
+PACKAGE_FILES  = $(SOURCES)
+PACKAGE_FILES += Makefile
+
+all: $(SERVER_TARGET) $(CLIENT_TARGET)
+
+$(SERVER_TARGET): $(SERVER_SOURCE)
+	$(CC) $(CCFLAGS) -o $@ $^ $(LDFLAGS) -DRDP_SERVER
+
+$(CLIENT_TARGET): $(CLIENT_SOURCE)
+	$(CC) $(CCFLAGS) -o $@ $^ $(LDFLAGS) -DRDP_CLIENT
+
+.PHONY: clean
+clean:
+	rm -f $(TARGETS)
