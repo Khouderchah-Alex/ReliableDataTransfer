@@ -1,4 +1,6 @@
-// File: rdt.cpp
+/* File: rdt.cpp
+ * Description: Main implementation of the RdtConnection class
+ */
 
 #include "rdt.h"
 #include <unistd.h>
@@ -28,27 +30,6 @@ RdtConnection::RdtConnection() :
 RdtConnection::~RdtConnection()
 {
 	Shutdown();
-}
-
-void RdtConnection::TestClient()
-{
-	RdtPacket *pPkt = new RdtPacket;
-	pPkt->hdr.m_Flags = 0;
-	pPkt->hdr.m_SeqNumber = m_NextSeq;
-	pPkt->hdr.m_Reserved = 0;
-	pPkt->hdr.m_MsgLen = sizeof(RdtHeader) + 2;
-	pPkt->msg[sizeof(RdtHeader)] = 'H';
-	pPkt->msg[sizeof(RdtHeader)+1] = '\0';
-	Send(pPkt);
-}
-
-void RdtConnection::TestServer()
-{
-	int result;
-	RdtPacket pkt;
-	while((result = Update(&pkt)) != EUR_DATA){}
-
-	std::cout << &(pkt.msg[sizeof(RdtHeader)]) << "\n";
 }
 
 int RdtConnection::Initialize()
@@ -82,9 +63,7 @@ int RdtConnection::_Init()
 	FD_ZERO(&m_fdsMain);
 	FD_SET(m_UdpSocket, &m_fdsMain);
 
-	#ifdef RDT_CLIENT
 	m_ReceivedList.clear();
-    #endif
 
 	m_UnackedPackets.Initialize((MULT<RDT_WNDSIZE,2>::val / RDT_MSS) + 1);
 	return 0;
@@ -157,18 +136,6 @@ int RdtConnection::SendRequest(std::string filename)
 	// Send packet
 	Send(pRequest);
 
-	// Wait until ACKed
-	/*
-	int result;
-	while((result = Update()) != EUR_ACK)
-	{
-		if(result == -1)
-		{
-			return -1;
-		}
-	}
-	*/
-
 	return 0;
 }
 
@@ -199,6 +166,11 @@ int RdtConnection::RecvFile(std::string outputFile)
 				bReceivedFirst = true;
 				expectedSeq = (pkt.hdr.m_SeqNumber + pkt.hdr.m_MsgLen) % RDT_MAX_SEQNUM;
 				outFile.write(&pktStr[0], pktStr.length());
+
+				if(pkt.hdr.m_Flags & RdtHeader::FLAG_LAST)
+				{
+					goto close;
+				}
 			}
 			else if(bReceivedFirst && pkt.hdr.m_SeqNumber == expectedSeq)
 			{
@@ -351,7 +323,7 @@ int RdtConnection::SendFile(std::string filename)
 
 		// While info left, send packets until window fills, then update
 		bool bFirst = true;
-		while(len != 0)
+		do
 		{
 			int msgLen = std::min((std::streamoff)RDT_MSS, len);
 			len -= msgLen;
@@ -360,18 +332,16 @@ int RdtConnection::SendFile(std::string filename)
 			RdtPacket *pPkt = new RdtPacket;
 			pPkt->hdr.m_SeqNumber = m_NextSeq;
 			pPkt->hdr.m_Reserved = 0;
+			pPkt->hdr.m_Flags = 0;
 			if(bFirst)
 			{
 				pPkt->hdr.m_Flags = RdtHeader::FLAG_FIRST;
 				bFirst = false;
 			}
-			else if(len == 0)
+
+			if(len == 0)
 			{
-				pPkt->hdr.m_Flags = RdtHeader::FLAG_LAST;
-			}
-			else
-			{
-				pPkt->hdr.m_Flags = 0;
+				pPkt->hdr.m_Flags |= RdtHeader::FLAG_LAST;
 			}
 			pPkt->hdr.m_MsgLen = msgLen + sizeof(RdtHeader);
 			inFile.read(&(pPkt->msg[sizeof(RdtHeader)]), msgLen);
@@ -395,7 +365,7 @@ int RdtConnection::SendFile(std::string filename)
 			}
 
 			Send(pPkt);
-		}
+		} while(len != 0);
 
 		inFile.close();
 
@@ -571,7 +541,6 @@ int RdtConnection::Update(RdtPacket *pPkt)
 			}
 			else
 			{
-				#ifdef RDT_CLIENT
 				// Remove expired elements from received list
 				bool bAlreadyExists = false;
 				for(auto iter = m_ReceivedList.begin(); iter != m_ReceivedList.end();)
@@ -601,7 +570,6 @@ int RdtConnection::Update(RdtPacket *pPkt)
 				{
 					return 0; // Only return EUR_DATA first time a pkt is received
 				}
-				#endif
 
 				return EUR_DATA;
 			}
@@ -634,7 +602,7 @@ void RdtConnection::Resend(clock_t currTime)
 
 bool RdtConnection::Send(RdtPacket *pPkt, bool isResend, bool isSyn)
 {
-	auto len = pPkt->hdr.m_MsgLen;
+	uint16_t len = pPkt->hdr.m_MsgLen;
 
 	if(!isResend && pPkt->hdr.m_Flags != RdtHeader::FLAG_ACK &&
 	   pPkt->hdr.m_Flags != (RdtHeader::FLAG_ACK | RdtHeader::FLAG_FIN))
@@ -676,6 +644,8 @@ bool RdtConnection::Send(RdtPacket *pPkt, bool isResend, bool isSyn)
 
 		// Update variables
 		m_WndCurr += len;
+
+		/*len = (len < 1) ? 1u : len;*/
 		m_NextSeq = (pPkt->hdr.m_SeqNumber + len) % RDT_MAX_SEQNUM;
 	}
 
@@ -724,7 +694,6 @@ bool RdtConnection::Recv(RdtPacket &pkt, sockaddr *pAddr)
 	// Print message
 	std::cout << "Receiving packet " << pkt.hdr.m_SeqNumber;
 
-	#ifdef RDT_CLIENT
 	for(auto i : m_ReceivedList)
 	{
 		if(i == pkt.hdr.m_SeqNumber)
@@ -733,7 +702,6 @@ bool RdtConnection::Recv(RdtPacket &pkt, sockaddr *pAddr)
 			break;
 		}
 	}
-	#endif
 
 	std::cout << "\n";
 

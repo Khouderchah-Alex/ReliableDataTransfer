@@ -1,6 +1,7 @@
-// File: rdt.h
-// Description: Header containing the API definitions for
-//              rdt (reliable datagram protocol).
+/* File: rdt.h
+ * Description: Header containing the API definitions for
+ *              rdt (reliable datagram transfer).
+ */
 
 #ifndef _RDT_H_
 #define _RDT_H_
@@ -23,13 +24,33 @@
 
 #include "rdt_structures.h"
 
+/**
+ * @brief Class providing the top-level API
+ *
+ * With an instance of this class, one can can use the provided API
+ * (which is similar to that of the Berkeley Sockets API) in order to have
+ * reliable data transfer over UDP.
+ *
+ * @note This implementation does not currently perform flow or congestion
+ * control.
+ */
 class RdtConnection
 {
 public:
 	RdtConnection();
 	~RdtConnection();
 
+	/**
+	 * @brief Sets up the data structure and creates a UDP socket
+	 * @return 0 if succesful, -1 if failed
+	 */
 	int Initialize();
+
+	/**
+	 * @brief Clears the data structure are closes the UDP socket
+	 * @TODO reject pending any clients
+	 * @return 0 if successful, -1 if failed
+	 */
 	void Shutdown();
 
 	/**
@@ -100,9 +121,6 @@ public:
 	 */
 	int Close();
 
-	void TestClient();
-	void TestServer();
-
 private:
 	int _Init();
 
@@ -148,9 +166,7 @@ private:
 
 	bool m_ReceivedFIN;
 
-	#ifdef RDT_CLIENT
 	std::list<uint16_t> m_ReceivedList;
-	#endif
 };
 
 #endif //_RDT_H_

@@ -1,5 +1,8 @@
-// File: server.cpp
-// Description: Source code for the Project2 server application
+/* File: simple_server.cpp
+ * Description: Simple server application that takes in the port this server
+ *              should use. The server itself can only serve a single client at
+ *              a time, but this can be improved in the future.
+ */
 
 #include "rdt.h"
 #include <iostream>

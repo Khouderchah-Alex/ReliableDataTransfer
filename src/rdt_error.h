@@ -1,8 +1,9 @@
-// File: rdt_error.h
-// Description: File to define the different classes of errors that occur in a
-//              project. Source code that includes this header can use the line
-//              "ERROR(ERR_TYPE, exit);" to print the error message and
-//              optionally exit the program.
+/* File: rdt_error.h
+ * Description: File to define the different classes of errors that occur in a
+ *              project. Source code that includes this header can use the line
+ *              "ERROR(ERR_TYPE, exit);" to print the error message and
+ *              optionally exit the program.
+ */
 
 #include <iostream>
 

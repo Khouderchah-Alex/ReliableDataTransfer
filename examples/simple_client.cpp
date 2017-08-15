@@ -1,5 +1,9 @@
-// File: client.cpp
-// Description: Source code for the Project2 client application
+/* File: simple_client.cpp
+ * Description: Simple client application that takes in server name & port,
+ *              as well as the name of a file to request from the server,
+ *              and attempts to communicate with the server in order to
+ *              safely receive the file.
+ */
 
 #include "rdt.h"
 #include <netdb.h>
