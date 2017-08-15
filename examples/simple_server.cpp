@@ -1,8 +1,7 @@
 // File: server.cpp
 // Description: Source code for the Project2 server application
 
-#include "rdp.h"
-#include "Error.h"
+#include "rdt.h"
 #include <iostream>
 
 #define BACKLOG 10
@@ -20,7 +19,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	RdpConnection listener;
+	RdtConnection listener;
 	if(listener.Initialize() == -1)
 	{
 		ERROR(ERR_SOCKET, true);
@@ -69,5 +68,5 @@ int main(int argc, char **argv)
 void printHelp(char **argv)
 {
 	cout << "usage: " << argv[0] << " portNum\n\n";
-	cout << "Runs the rdp (reliable data protocol) server with the given port number.\n";
+	cout << "Runs the rdt (reliable data protocol) server with the given port number.\n";
 }

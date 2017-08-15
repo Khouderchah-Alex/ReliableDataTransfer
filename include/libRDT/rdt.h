@@ -1,9 +1,9 @@
-// File: rdp.h
+// File: rdt.h
 // Description: Header containing the API definitions for
-//              rdp (reliable datagram protocol).
+//              rdt (reliable datagram protocol).
 
-#ifndef _RDP_H_
-#define _RDP_H_
+#ifndef _RDT_H_
+#define _RDT_H_
 
 #include <cstdint>
 #include <sys/types.h>
@@ -15,13 +15,19 @@
 #include <unordered_map>
 #include <list>
 
-#include "rdp_structures.h"
+// If this is not defined, simply include a custom ERROR function/macro
+// in order to do something different when errors occur
+#ifdef USE_RDT_ERROR
+#include "rdt_error.h"
+#endif
 
-class RdpConnection
+#include "rdt_structures.h"
+
+class RdtConnection
 {
 public:
-	RdpConnection();
-	~RdpConnection();
+	RdtConnection();
+	~RdtConnection();
 
 	int Initialize();
 	void Shutdown();
@@ -101,18 +107,18 @@ private:
 	int _Init();
 
 	/**
-	 * @brief Updates the rdp state (sends/receives ACKs/data/SYNACKs/etc)
+	 * @brief Updates the rdt state (sends/receives ACKs/data/SYNACKs/etc)
 	 *
-	 * This function should be placed inside of a loop such that the rdp protocol
+	 * This function should be placed inside of a loop such that the rdt protocol
 	 * will behave as expected. Note that the typical socket API does not contain this
 	 * function because such operations are performed by the OS usually.
 	 *
 	 * @return -1 on error, 0 for normal call
 	 */
-	int Update(RdpPacket *pPkt=nullptr);
+	int Update(RdtPacket *pPkt=nullptr);
 
-	bool Send(RdpPacket *pPkt, bool isResend=false, bool isSyn=false);
-	bool Recv(RdpPacket &pkt, sockaddr *pAddr=nullptr);
+	bool Send(RdtPacket *pPkt, bool isResend=false, bool isSyn=false);
+	bool Recv(RdtPacket &pkt, sockaddr *pAddr=nullptr);
 	void Resend(clock_t currTime);
 	void Ack(UnackedPacket *pUnacked);
 
@@ -142,9 +148,9 @@ private:
 
 	bool m_ReceivedFIN;
 
-	#ifdef RDP_CLIENT
+	#ifdef RDT_CLIENT
 	std::list<uint16_t> m_ReceivedList;
 	#endif
 };
 
-#endif //_RDP_H_
+#endif //_RDT_H_

@@ -6,7 +6,13 @@ This project is an implementation of a reliable data transfer protocol that was 
 ## Implementation
 The fundamental concept of our reliability protocol is the RdpConnection class, which contains all of the state necessary to perform the needed reliability functions---such as keeping track of unacked packets and their resend times---as well as providing all of the needed network-reliability functionality.
 
-The structure of a packet is quite simple. Every packet consists of 64-bit header followed by some amount (between 0 and 1020 bytes) of data. The packet header contains the packet's sequence number (or ACK number if the packet is an ACK), the size of the packet including the header size, and any flags. The available flags are `ACK`, `SYN`, `FIN`, `RQST` (for a file request), `FIRST` (for the first packet in a file transmission), and `LAST` (for the last packet in a file transmission).
+The structure of a packet is quite simple. Every packet consists of 64-bit header followed by some amount (between 0 and 1020 bytes) of data. The packet header contains the packet's sequence number (or ACK number if the packet is an ACK), the size of the packet including the header size, and any flags. The available flags are:
+* `ACK` -- for an acknowledgement
+* `SYN` -- for connection initialization
+* `FIN` -- for connection termination
+* `RQST` -- for a file request
+* `FIRST` -- for the first packet in a file transmission
+* `LAST` -- for the last packet in a file transmission
 
 Unacked packets are kept track of by the use of a circular buffer. Every element of the circular buffer contains a pointer to its respective packet (or nullptr if the packet has been acked), a resend time, and a pointer to the unacked packet that has the next greatest resend time. That is, while the unacked packets are consecutive in memory by virtue of being placed in a circular buffer, they also form a linked list that is sorted based on earliest resend time. Note that the first unacked packet to be added to the circular buffer is not necessarily always the first to be resent (immediately after being resent, the first packet in the circular buffer will have the latest resend time). Every time a previously-unACKed packet is ACKed, its corresponding circular buffer element will be removed from the linked list. Furthermore, if the ACKed packet is the first element in the circular buffer, it will be removed from the circular buffer, along with any following elements that have already been ACKed. Whenever a packet is sent for the first time, it will be added to the circular buffer, placed at the end of the resend linked list, and a hash table mapping sequence numbers to circular buffer indices will be updated.
 

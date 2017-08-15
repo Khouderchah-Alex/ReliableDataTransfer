@@ -1,4 +1,4 @@
-// File: Error.h
+// File: rdt_error.h
 // Description: File to define the different classes of errors that occur in a
 //              project. Source code that includes this header can use the line
 //              "ERROR(ERR_TYPE, exit);" to print the error message and
@@ -6,7 +6,7 @@
 
 #include <iostream>
 
-static const std::string PROJECT_NAME = "Project2";
+static const std::string PROJECT_NAME = "libRDT";
 
 #define ERR(f)															\
 	f(ERR_OPEN,          1, "Failed to open the terminal file")			\

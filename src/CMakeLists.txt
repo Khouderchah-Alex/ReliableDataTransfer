@@ -1,0 +1,9 @@
+add_library(RDT ${RDT_SRC} ${RDT_HEADER})
+set_target_properties(RDT PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  LINKER_LANGUAGE CXX
+  FOLDER "RDT")
+
+target_include_directories(RDT PRIVATE
+  "${CMAKE_CURRENT_SOURCE_DIR}/"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../include/libRDT")

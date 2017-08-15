@@ -1,9 +1,9 @@
-// File: rdp_structures.h
+// File: rdt_structures.h
 // Description: Header containing the internal structs and classes used
-//              by the rdp protocol. Should not be included by user code.
+//              by the rdt protocol. Should not be included by user code.
 
-#ifndef _RDP_STRUCTURES_H_
-#define _RDP_STRUCTURES_H_
+#ifndef _RDT_STRUCTURES_H_
+#define _RDT_STRUCTURES_H_
 
 #include <cstdint>
 #include <arpa/inet.h>
@@ -12,14 +12,14 @@
 template<int N, int M> struct DIV{ enum{ val = N/M }; };
 template<int N, int M> struct MULT{ enum{ val = N * M }; };
 
-#define RDP_MAX_SEQNUM 30720 // Sequence numbers are in bytes
-#define RDP_HALF_SEQSIZE DIV<RDP_MAX_SEQNUM,2>::val
-#define RDP_WNDSIZE 5120 // Window size defined in bytes
-#define RDP_RTO_MS 500 // Defined in ms
-#define RDP_RTO_CLK DIV<MULT<RDP_RTO_MS,CLOCKS_PER_SEC>::val, 1000>::val
-#define RDP_MAX_PKTSIZE 1024
-#define RDP_MSS (RDP_MAX_PKTSIZE - sizeof(RdpHeader) - 1)
-#define RDP_MAX_CONNECTIONS 64
+#define RDT_MAX_SEQNUM 30720 // Sequence numbers are in bytes
+#define RDT_HALF_SEQSIZE DIV<RDT_MAX_SEQNUM,2>::val
+#define RDT_WNDSIZE 5120 // Window size defined in bytes
+#define RDT_RTO_MS 500 // Defined in ms
+#define RDT_RTO_CLK DIV<MULT<RDT_RTO_MS,CLOCKS_PER_SEC>::val, 1000>::val
+#define RDT_MAX_PKTSIZE 1024
+#define RDT_MSS (RDT_MAX_PKTSIZE - sizeof(RdtHeader) - 1)
+#define RDT_MAX_CONNECTIONS 64
 
 template<typename T>
 class CircularBuffer
@@ -108,7 +108,7 @@ struct SendQueueElem
  *       checksum field isn't necessary (of course, we could implement a more
  *       robust checksum system if UDP's simple checksum wasn't good enough).
  */
-struct RdpHeader
+struct RdtHeader
 {
 	uint16_t m_SeqNumber;
 	uint16_t m_Reserved;
@@ -130,12 +130,12 @@ struct RdpHeader
 	void hton();
 };
 
-struct RdpPacket
+struct RdtPacket
 {
 	union
 	{
-		RdpHeader hdr;
-		char msg[RDP_MAX_PKTSIZE];
+		RdtHeader hdr;
+		char msg[RDT_MAX_PKTSIZE];
 	};
 };
 
@@ -144,7 +144,7 @@ struct UnackedPacket
 	UnackedPacket() : m_ResendTime(0), m_pNext(nullptr), m_pPacket(nullptr){}
 	clock_t m_ResendTime;
 	UnackedPacket *m_pNext;
-	RdpPacket *m_pPacket;  // Points to packet if unacked, otherwise is nullptr
+	RdtPacket *m_pPacket;  // Points to packet if unacked, otherwise is nullptr
 };
 
-#endif //_RDP_STRUCTURES_H_
+#endif //_RDT_STRUCTURES_H_

@@ -1,8 +1,6 @@
-// File: rdp.cpp
+// File: rdt.cpp
 
-#include "rdp.h"
-#include "rdp_structures.h"
-#include "Error.h"
+#include "rdt.h"
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
@@ -19,41 +17,41 @@ enum EUpdateResult
 	EUR_DROPPED
 };
 
-RdpConnection::RdpConnection() :
+RdtConnection::RdtConnection() :
 	m_UdpSocket(-1), m_IsListener(false), m_pAddr(nullptr),
-	m_WndSize(RDP_WNDSIZE), m_WndCurr(0), m_EarliestTimeout(0),
+	m_WndSize(RDT_WNDSIZE), m_WndCurr(0), m_EarliestTimeout(0),
 	m_pEarliestPacket(nullptr), m_pLatestPacket(nullptr), m_NextSeq(0),
 	m_MinUnacked(-1), m_SynIndex(-1), m_ReceivedFIN(false)
 {
 }
 
-RdpConnection::~RdpConnection()
+RdtConnection::~RdtConnection()
 {
 	Shutdown();
 }
 
-void RdpConnection::TestClient()
+void RdtConnection::TestClient()
 {
-	RdpPacket *pPkt = new RdpPacket;
+	RdtPacket *pPkt = new RdtPacket;
 	pPkt->hdr.m_Flags = 0;
 	pPkt->hdr.m_SeqNumber = m_NextSeq;
 	pPkt->hdr.m_Reserved = 0;
-	pPkt->hdr.m_MsgLen = sizeof(RdpHeader) + 2;
-	pPkt->msg[sizeof(RdpHeader)] = 'H';
-	pPkt->msg[sizeof(RdpHeader)+1] = '\0';
+	pPkt->hdr.m_MsgLen = sizeof(RdtHeader) + 2;
+	pPkt->msg[sizeof(RdtHeader)] = 'H';
+	pPkt->msg[sizeof(RdtHeader)+1] = '\0';
 	Send(pPkt);
 }
 
-void RdpConnection::TestServer()
+void RdtConnection::TestServer()
 {
 	int result;
-	RdpPacket pkt;
+	RdtPacket pkt;
 	while((result = Update(&pkt)) != EUR_DATA){}
 
-	std::cout << &(pkt.msg[sizeof(RdpHeader)]) << "\n";
+	std::cout << &(pkt.msg[sizeof(RdtHeader)]) << "\n";
 }
 
-int RdpConnection::Initialize()
+int RdtConnection::Initialize()
 {
 	if(m_UdpSocket != -1)
 	{
@@ -72,7 +70,7 @@ int RdpConnection::Initialize()
 	return _Init();
 }
 
-int RdpConnection::_Init()
+int RdtConnection::_Init()
 {
 	static bool firstInit = true;
 	if(firstInit)
@@ -84,15 +82,15 @@ int RdpConnection::_Init()
 	FD_ZERO(&m_fdsMain);
 	FD_SET(m_UdpSocket, &m_fdsMain);
 
-	#ifdef RDP_CLIENT
+	#ifdef RDT_CLIENT
 	m_ReceivedList.clear();
     #endif
 
-	m_UnackedPackets.Initialize((MULT<RDP_WNDSIZE,2>::val / RDP_MSS) + 1);
+	m_UnackedPackets.Initialize((MULT<RDT_WNDSIZE,2>::val / RDT_MSS) + 1);
 	return 0;
 }
 
-void RdpConnection::Shutdown()
+void RdtConnection::Shutdown()
 {
 	if(m_UdpSocket != -1)
 	{
@@ -109,17 +107,17 @@ void RdpConnection::Shutdown()
 	m_PendingConnections.Shutdown();
 }
 
-int RdpConnection::Connect(const sockaddr *address, socklen_t address_len)
+int RdtConnection::Connect(const sockaddr *address, socklen_t address_len)
 {
 	m_pAddr = (sockaddr*)address;
 	m_AddrLen = address_len;
 
 	// Send SYN
-	RdpPacket *pSyn = new RdpPacket;
-	pSyn->hdr.m_SeqNumber = rand() % RDP_MAX_SEQNUM;
+	RdtPacket *pSyn = new RdtPacket;
+	pSyn->hdr.m_SeqNumber = rand() % RDT_MAX_SEQNUM;
 	pSyn->hdr.m_Reserved = 0;
-	pSyn->hdr.m_Flags = RdpHeader::FLAG_SYN;
-	pSyn->hdr.m_MsgLen = sizeof(RdpHeader);
+	pSyn->hdr.m_Flags = RdtHeader::FLAG_SYN;
+	pSyn->hdr.m_MsgLen = sizeof(RdtHeader);
 	Send(pSyn, false, true);
 
 	// Wait for SYN-ACK (ACK will be sent by Update())
@@ -136,25 +134,25 @@ int RdpConnection::Connect(const sockaddr *address, socklen_t address_len)
 	return 0;
 }
 
-int RdpConnection::SendRequest(std::string filename)
+int RdtConnection::SendRequest(std::string filename)
 {
 	// Ensure that request can be in a single packet
-	if(filename.length() >= RDP_MAX_PKTSIZE - sizeof(RdpHeader))
+	if(filename.length() >= RDT_MAX_PKTSIZE - sizeof(RdtHeader))
 	{
 		return -1;
 	}
 
 	// Send RQST packet
-	RdpPacket *pRequest = new RdpPacket;
+	RdtPacket *pRequest = new RdtPacket;
 	pRequest->hdr.m_SeqNumber = m_NextSeq;
 	pRequest->hdr.m_Reserved = 0;
-	pRequest->hdr.m_Flags = RdpHeader::FLAG_RQST;
-	pRequest->hdr.m_MsgLen = filename.length() + sizeof(RdpHeader) + 1;
+	pRequest->hdr.m_Flags = RdtHeader::FLAG_RQST;
+	pRequest->hdr.m_MsgLen = filename.length() + sizeof(RdtHeader) + 1;
 
 	// Copy name into packet
-	filename.copy(&(pRequest->msg[sizeof(RdpHeader)]),
-				  RDP_MAX_PKTSIZE-sizeof(RdpHeader));
-	pRequest->msg[sizeof(RdpHeader)+filename.length()] = '\0';
+	filename.copy(&(pRequest->msg[sizeof(RdtHeader)]),
+				  RDT_MAX_PKTSIZE-sizeof(RdtHeader));
+	pRequest->msg[sizeof(RdtHeader)+filename.length()] = '\0';
 
 	// Send packet
 	Send(pRequest);
@@ -174,7 +172,7 @@ int RdpConnection::SendRequest(std::string filename)
 	return 0;
 }
 
-int RdpConnection::RecvFile(std::string outputFile)
+int RdtConnection::RecvFile(std::string outputFile)
 {
 	std::ofstream outFile(outputFile, std::ios::out
 						  | std::ios::trunc | std::ios::binary);
@@ -183,7 +181,7 @@ int RdpConnection::RecvFile(std::string outputFile)
 		return -1;
 	}
 
-	RdpPacket pkt;
+	RdtPacket pkt;
 	std::string pktStr;
 	std::unordered_map<uint16_t,std::string> seqToStr;
 	uint16_t expectedSeq;
@@ -194,20 +192,20 @@ int RdpConnection::RecvFile(std::string outputFile)
 	{
 		if(Update(&pkt) == EUR_DATA)
 		{
-			pktStr = std::string(&(pkt.msg[sizeof(RdpHeader)]), pkt.hdr.m_MsgLen - sizeof(RdpHeader));
+			pktStr = std::string(&(pkt.msg[sizeof(RdtHeader)]), pkt.hdr.m_MsgLen - sizeof(RdtHeader));
 
-			if(!bReceivedFirst && pkt.hdr.m_Flags & RdpHeader::FLAG_FIRST)
+			if(!bReceivedFirst && pkt.hdr.m_Flags & RdtHeader::FLAG_FIRST)
 			{
 				bReceivedFirst = true;
-				expectedSeq = (pkt.hdr.m_SeqNumber + pkt.hdr.m_MsgLen) % RDP_MAX_SEQNUM;
+				expectedSeq = (pkt.hdr.m_SeqNumber + pkt.hdr.m_MsgLen) % RDT_MAX_SEQNUM;
 				outFile.write(&pktStr[0], pktStr.length());
 			}
 			else if(bReceivedFirst && pkt.hdr.m_SeqNumber == expectedSeq)
 			{
-				expectedSeq = (expectedSeq + pkt.hdr.m_MsgLen) % RDP_MAX_SEQNUM;
+				expectedSeq = (expectedSeq + pkt.hdr.m_MsgLen) % RDT_MAX_SEQNUM;
 				outFile.write(&pktStr[0], pktStr.length());
 
-				if(pkt.hdr.m_Flags & RdpHeader::FLAG_LAST)
+				if(pkt.hdr.m_Flags & RdtHeader::FLAG_LAST)
 				{
 					goto close;
 				}
@@ -222,14 +220,14 @@ int RdpConnection::RecvFile(std::string outputFile)
 					}
 
 					expectedSeq = (expectedSeq + iter->second.length()
-								   + sizeof(RdpHeader)) % RDP_MAX_SEQNUM;
+								   + sizeof(RdtHeader)) % RDT_MAX_SEQNUM;
 					seqToStr.erase(iter);
 				}
 			}
 			else
 			{
 				// Only store out-of-order packets that are within the window
-				if(!bReceivedLast && pkt.hdr.m_Flags & RdpHeader::FLAG_LAST)
+				if(!bReceivedLast && pkt.hdr.m_Flags & RdtHeader::FLAG_LAST)
 				{
 					bReceivedLast = true;
 					lastSeq = pkt.hdr.m_SeqNumber;
@@ -244,7 +242,7 @@ close:
 	return 0;
 }
 
-int RdpConnection::WaitAndClose()
+int RdtConnection::WaitAndClose()
 {
 	// Wait for FIN
 	int result;
@@ -257,11 +255,11 @@ int RdpConnection::WaitAndClose()
 	}
 
 	// Send FIN
-	RdpPacket *pFin = new RdpPacket;
+	RdtPacket *pFin = new RdtPacket;
 	pFin->hdr.m_SeqNumber = m_NextSeq;
 	pFin->hdr.m_Reserved = 0;
-	pFin->hdr.m_Flags = RdpHeader::FLAG_FIN;
-	pFin->hdr.m_MsgLen = sizeof(RdpHeader);
+	pFin->hdr.m_Flags = RdtHeader::FLAG_FIN;
+	pFin->hdr.m_MsgLen = sizeof(RdtHeader);
 	Send(pFin);
 
 	// Wait for FIN-ACK
@@ -277,12 +275,12 @@ int RdpConnection::WaitAndClose()
 	return 0;
 }
 
-int RdpConnection::Bind(const sockaddr *address, socklen_t address_len)
+int RdtConnection::Bind(const sockaddr *address, socklen_t address_len)
 {
 	return ::bind(m_UdpSocket, address, address_len);
 }
 
-int RdpConnection::Listen(int backlog)
+int RdtConnection::Listen(int backlog)
 {
 	if(backlog < 1)
 	{
@@ -298,7 +296,7 @@ int RdpConnection::Listen(int backlog)
 	return 0;
 }
 
-int RdpConnection::Accept(sockaddr *address, socklen_t address_len)
+int RdtConnection::Accept(sockaddr *address, socklen_t address_len)
 {
 	if(m_pAddr != nullptr){ return -1; }
 
@@ -314,21 +312,21 @@ int RdpConnection::Accept(sockaddr *address, socklen_t address_len)
 	m_AddrLen = sizeof(sockaddr_in);
 
 	// Send synack
-	RdpPacket *pSyn = new RdpPacket;
-	pSyn->hdr.m_SeqNumber = rand() % RDP_MAX_SEQNUM;
+	RdtPacket *pSyn = new RdtPacket;
+	pSyn->hdr.m_SeqNumber = rand() % RDT_MAX_SEQNUM;
 	pSyn->hdr.m_Reserved = 0;
-	pSyn->hdr.m_Flags = RdpHeader::FLAG_SYN | RdpHeader::FLAG_ACK;
-	pSyn->hdr.m_MsgLen = sizeof(RdpHeader);
+	pSyn->hdr.m_Flags = RdtHeader::FLAG_SYN | RdtHeader::FLAG_ACK;
+	pSyn->hdr.m_MsgLen = sizeof(RdtHeader);
 	Send(pSyn);
 
 	return 0;
 }
 
-int RdpConnection::RecvRequest(std::string &filename)
+int RdtConnection::RecvRequest(std::string &filename)
 {
 	// Wait for request packet from client
 	int result;
-	RdpPacket rqst;
+	RdtPacket rqst;
 	while((result = Update(&rqst)) != EUR_RQST)
 	{
 		if(result == -1)
@@ -337,11 +335,11 @@ int RdpConnection::RecvRequest(std::string &filename)
 		}
 	}
 
-	filename = std::string(&(rqst.msg[sizeof(RdpHeader)]));
+	filename = std::string(&(rqst.msg[sizeof(RdtHeader)]));
 	return 0;
 }
 
-int RdpConnection::SendFile(std::string filename)
+int RdtConnection::SendFile(std::string filename)
 {
 	std::ifstream inFile(filename, std::ios::binary | std::ios::ate);
 
@@ -355,35 +353,35 @@ int RdpConnection::SendFile(std::string filename)
 		bool bFirst = true;
 		while(len != 0)
 		{
-			int msgLen = std::min((std::streamoff)RDP_MSS, len);
+			int msgLen = std::min((std::streamoff)RDT_MSS, len);
 			len -= msgLen;
 
 			// Create packet
-			RdpPacket *pPkt = new RdpPacket;
+			RdtPacket *pPkt = new RdtPacket;
 			pPkt->hdr.m_SeqNumber = m_NextSeq;
 			pPkt->hdr.m_Reserved = 0;
 			if(bFirst)
 			{
-				pPkt->hdr.m_Flags = RdpHeader::FLAG_FIRST;
+				pPkt->hdr.m_Flags = RdtHeader::FLAG_FIRST;
 				bFirst = false;
 			}
 			else if(len == 0)
 			{
-				pPkt->hdr.m_Flags = RdpHeader::FLAG_LAST;
+				pPkt->hdr.m_Flags = RdtHeader::FLAG_LAST;
 			}
 			else
 			{
 				pPkt->hdr.m_Flags = 0;
 			}
-			pPkt->hdr.m_MsgLen = msgLen + sizeof(RdpHeader);
-			inFile.read(&(pPkt->msg[sizeof(RdpHeader)]), msgLen);
-			//std::cerr.write(&(pPkt->msg[sizeof(RdpHeader)]), msgLen);
+			pPkt->hdr.m_MsgLen = msgLen + sizeof(RdtHeader);
+			inFile.read(&(pPkt->msg[sizeof(RdtHeader)]), msgLen);
+			//std::cerr.write(&(pPkt->msg[sizeof(RdtHeader)]), msgLen);
 
 			// Spin until we have room to send another packet
 			uint16_t nextSeq = m_NextSeq;
 			if(m_NextSeq < m_MinUnacked)
 			{
-				nextSeq += RDP_MAX_SEQNUM;
+				nextSeq += RDT_MAX_SEQNUM;
 			}
 			while(nextSeq + pPkt->hdr.m_MsgLen - m_MinUnacked > m_WndSize ||
 				  m_UnackedPackets.IsFull())
@@ -392,7 +390,7 @@ int RdpConnection::SendFile(std::string filename)
 				nextSeq = m_NextSeq;
 				if(m_NextSeq < m_MinUnacked)
 				{
-					nextSeq += RDP_MAX_SEQNUM;
+					nextSeq += RDT_MAX_SEQNUM;
 				}
 			}
 
@@ -413,14 +411,14 @@ int RdpConnection::SendFile(std::string filename)
 	return -1;
 }
 
-int RdpConnection::Close()
+int RdtConnection::Close()
 {
 	// Send FIN
-	RdpPacket *pFin = new RdpPacket;
+	RdtPacket *pFin = new RdtPacket;
 	pFin->hdr.m_SeqNumber = m_NextSeq;
 	pFin->hdr.m_Reserved = 0;
-	pFin->hdr.m_Flags = RdpHeader::FLAG_FIN;
-	pFin->hdr.m_MsgLen = sizeof(RdpHeader);
+	pFin->hdr.m_Flags = RdtHeader::FLAG_FIN;
+	pFin->hdr.m_MsgLen = sizeof(RdtHeader);
 	Send(pFin);
 
 	// Wait for FIN-ACK and FIN
@@ -446,7 +444,7 @@ int RdpConnection::Close()
 	}
 
 	// Wait for amount of time then close
-	clock_t finishTime = clock() + MULT<RDP_RTO_CLK, 2>::val;
+	clock_t finishTime = clock() + MULT<RDT_RTO_CLK, 2>::val;
 	do
 	{
 		if(Update() == -1)
@@ -459,7 +457,7 @@ int RdpConnection::Close()
 	return 0;
 }
 
-int RdpConnection::Update(RdpPacket *pPkt)
+int RdtConnection::Update(RdtPacket *pPkt)
 {
 	// Resend as needed
 	static clock_t currClock;
@@ -486,14 +484,14 @@ int RdpConnection::Update(RdpPacket *pPkt)
 	else
 	{
 		// Read from the udp socket
-		RdpPacket localPkt;
+		RdtPacket localPkt;
 		if(!pPkt){ pPkt = &localPkt; }
 
 		sockaddr addr;
 		if(!Recv(*pPkt, &addr)){ ERROR(ERR_RECV, false); return -1; }
 
 		// If SYN, handle only if listener
-		if(pPkt->hdr.m_Flags == RdpHeader::FLAG_SYN)
+		if(pPkt->hdr.m_Flags == RdtHeader::FLAG_SYN)
 		{
 			if(m_IsListener)
 			{
@@ -512,7 +510,7 @@ int RdpConnection::Update(RdpPacket *pPkt)
 			return EUR_DROPPED;
 		}
 		// If SYNACK
-		else if(pPkt->hdr.m_Flags == (RdpHeader::FLAG_ACK | RdpHeader::FLAG_SYN))
+		else if(pPkt->hdr.m_Flags == (RdtHeader::FLAG_ACK | RdtHeader::FLAG_SYN))
 		{
 			if(m_SynIndex != -1)
 			{
@@ -521,16 +519,16 @@ int RdpConnection::Update(RdpPacket *pPkt)
 			}
 
 			// Send ACK
-			RdpPacket ack = *pPkt;
-			ack.hdr.m_Flags = RdpHeader::FLAG_ACK;
-			ack.hdr.m_MsgLen = sizeof(RdpHeader);
+			RdtPacket ack = *pPkt;
+			ack.hdr.m_Flags = RdtHeader::FLAG_ACK;
+			ack.hdr.m_MsgLen = sizeof(RdtHeader);
 			ack.hdr.m_Reserved = 0;
 			Send(&ack);
 
 			return EUR_SYNACK;
 		}
 		// If ACK, find in unacked buffer & change m_WndCurr
-		else if(pPkt->hdr.m_Flags & RdpHeader::FLAG_ACK)
+		else if(pPkt->hdr.m_Flags & RdtHeader::FLAG_ACK)
 		{
 			auto iter = m_SeqToIndex.find(pPkt->hdr.m_SeqNumber);
 			if(iter != m_SeqToIndex.end())
@@ -539,21 +537,21 @@ int RdpConnection::Update(RdpPacket *pPkt)
 				m_SeqToIndex.erase(iter);
 			}
 
-			if(pPkt->hdr.m_Flags & RdpHeader::FLAG_FIN)
+			if(pPkt->hdr.m_Flags & RdtHeader::FLAG_FIN)
 			{
 				return EUR_FINACK;
 			}
 			return EUR_ACK;
 		}
 		// Else if FIN, handle
-		else if(pPkt->hdr.m_Flags == RdpHeader::FLAG_FIN)
+		else if(pPkt->hdr.m_Flags == RdtHeader::FLAG_FIN)
 		{
 			m_ReceivedFIN = true;
 
 			// Send FINACK (don't new the finack!)
-			pPkt->hdr.m_MsgLen = sizeof(RdpHeader);
+			pPkt->hdr.m_MsgLen = sizeof(RdtHeader);
 			pPkt->hdr.m_Reserved = 0;
-			pPkt->hdr.m_Flags = RdpHeader::FLAG_ACK | RdpHeader::FLAG_FIN;
+			pPkt->hdr.m_Flags = RdtHeader::FLAG_ACK | RdtHeader::FLAG_FIN;
 			Send(pPkt);
 			return EUR_FIN;
 		}
@@ -561,19 +559,19 @@ int RdpConnection::Update(RdpPacket *pPkt)
 		else
 		{
 			// Send ACK
-			RdpPacket ack = *pPkt;
-			ack.hdr.m_Flags = RdpHeader::FLAG_ACK;
-			ack.hdr.m_MsgLen = sizeof(RdpHeader);
+			RdtPacket ack = *pPkt;
+			ack.hdr.m_Flags = RdtHeader::FLAG_ACK;
+			ack.hdr.m_MsgLen = sizeof(RdtHeader);
 			ack.hdr.m_Reserved = 0;
 			Send(&ack);
 
-			if(pPkt->hdr.m_Flags & RdpHeader::FLAG_RQST)
+			if(pPkt->hdr.m_Flags & RdtHeader::FLAG_RQST)
 			{
 				return EUR_RQST;
 			}
 			else
 			{
-				#ifdef RDP_CLIENT
+				#ifdef RDT_CLIENT
 				// Remove expired elements from received list
 				bool bAlreadyExists = false;
 				for(auto iter = m_ReceivedList.begin(); iter != m_ReceivedList.end();)
@@ -584,7 +582,7 @@ int RdpConnection::Update(RdpPacket *pPkt)
 					}
 
 					auto diff = std::abs(*iter - pPkt->hdr.m_SeqNumber);
-					if(RDP_WNDSIZE < diff && diff < RDP_MAX_SEQNUM - RDP_WNDSIZE)
+					if(RDT_WNDSIZE < diff && diff < RDT_MAX_SEQNUM - RDT_WNDSIZE)
 					{
 						iter = m_ReceivedList.erase(iter);
 					}
@@ -613,13 +611,13 @@ int RdpConnection::Update(RdpPacket *pPkt)
 	return 0;
 }
 
-void RdpConnection::Resend(clock_t currTime)
+void RdtConnection::Resend(clock_t currTime)
 {
 	while(currTime >= m_EarliestTimeout && m_pEarliestPacket != nullptr)
 	{
 		// Resend packet
 		Send(m_pEarliestPacket->m_pPacket, true);
-		m_pEarliestPacket->m_ResendTime = clock() + RDP_RTO_CLK;
+		m_pEarliestPacket->m_ResendTime = clock() + RDT_RTO_CLK;
 
 		// Update linked list
 		if(m_pEarliestPacket != m_pLatestPacket)
@@ -634,16 +632,16 @@ void RdpConnection::Resend(clock_t currTime)
 	}
 }
 
-bool RdpConnection::Send(RdpPacket *pPkt, bool isResend, bool isSyn)
+bool RdtConnection::Send(RdtPacket *pPkt, bool isResend, bool isSyn)
 {
 	auto len = pPkt->hdr.m_MsgLen;
 
-	if(!isResend && pPkt->hdr.m_Flags != RdpHeader::FLAG_ACK &&
-	   pPkt->hdr.m_Flags != (RdpHeader::FLAG_ACK | RdpHeader::FLAG_FIN))
+	if(!isResend && pPkt->hdr.m_Flags != RdtHeader::FLAG_ACK &&
+	   pPkt->hdr.m_Flags != (RdtHeader::FLAG_ACK | RdtHeader::FLAG_FIN))
 	{
 		// Create unacked packet
 		UnackedPacket unacked;
-		unacked.m_ResendTime = clock() + RDP_RTO_CLK;
+		unacked.m_ResendTime = clock() + RDT_RTO_CLK;
 		unacked.m_pNext = nullptr;
 		unacked.m_pPacket = pPkt;
 
@@ -678,7 +676,7 @@ bool RdpConnection::Send(RdpPacket *pPkt, bool isResend, bool isSyn)
 
 		// Update variables
 		m_WndCurr += len;
-		m_NextSeq = (pPkt->hdr.m_SeqNumber + len) % RDP_MAX_SEQNUM;
+		m_NextSeq = (pPkt->hdr.m_SeqNumber + len) % RDT_MAX_SEQNUM;
 	}
 
 	pPkt->hdr.hton();
@@ -693,29 +691,29 @@ bool RdpConnection::Send(RdpPacket *pPkt, bool isResend, bool isSyn)
 	pPkt->hdr.ntoh();
 
 	// Print message
-#if defined(RDP_SERVER) && !defined(RDP_CLIENT)
+#if defined(RDT_SERVER) && !defined(RDT_CLIENT)
 	std::cout << "Sending packet " << pPkt->hdr.m_SeqNumber << " " << m_WndSize;
 	if(isResend){ std::cout << " Retransmission"; }
-	if(pPkt->hdr.m_Flags & RdpHeader::FLAG_SYN){ std::cout << " SYN"; }
-	if(pPkt->hdr.m_Flags & RdpHeader::FLAG_FIN){ std::cout << " FIN"; }
+	if(pPkt->hdr.m_Flags & RdtHeader::FLAG_SYN){ std::cout << " SYN"; }
+	if(pPkt->hdr.m_Flags & RdtHeader::FLAG_FIN){ std::cout << " FIN"; }
 	std::cout << "\n";
-#elif !defined(RDP_SERVER) && defined(RDP_CLIENT)
+#elif !defined(RDT_SERVER) && defined(RDT_CLIENT)
 	std::cout << "Sending packet " << pPkt->hdr.m_SeqNumber;
 	if(isResend){ std::cout << " Retransmission"; }
-	if(pPkt->hdr.m_Flags & RdpHeader::FLAG_SYN){ std::cout << " SYN"; }
-	if(pPkt->hdr.m_Flags & RdpHeader::FLAG_FIN){ std::cout << " FIN"; }
+	if(pPkt->hdr.m_Flags & RdtHeader::FLAG_SYN){ std::cout << " SYN"; }
+	if(pPkt->hdr.m_Flags & RdtHeader::FLAG_FIN){ std::cout << " FIN"; }
 	std::cout << "\n";
 #else
-#error Exactly one of RDP_SERVER and RDP_CLIENT needs to be defined
+// Compiling for general case
 #endif
 
 	return true;
 }
 
-bool RdpConnection::Recv(RdpPacket &pkt, sockaddr *pAddr)
+bool RdtConnection::Recv(RdtPacket &pkt, sockaddr *pAddr)
 {
 	static socklen_t len = sizeof(sockaddr_in);
-	if(recvfrom(m_UdpSocket, pkt.msg, RDP_MAX_PKTSIZE, 0, pAddr, &len) == -1)
+	if(recvfrom(m_UdpSocket, pkt.msg, RDT_MAX_PKTSIZE, 0, pAddr, &len) == -1)
 	{
 		ERROR(ERR_RECV, false);
 		return false;
@@ -726,7 +724,7 @@ bool RdpConnection::Recv(RdpPacket &pkt, sockaddr *pAddr)
 	// Print message
 	std::cout << "Receiving packet " << pkt.hdr.m_SeqNumber;
 
-	#ifdef RDP_CLIENT
+	#ifdef RDT_CLIENT
 	for(auto i : m_ReceivedList)
 	{
 		if(i == pkt.hdr.m_SeqNumber)
@@ -742,7 +740,7 @@ bool RdpConnection::Recv(RdpPacket &pkt, sockaddr *pAddr)
 	return true;
 }
 
-void RdpConnection::Ack(UnackedPacket *pUnacked)
+void RdtConnection::Ack(UnackedPacket *pUnacked)
 {
 	if(pUnacked->m_pPacket == nullptr)
 	{
@@ -806,7 +804,7 @@ clear:
 	}
 }
 
-void RdpHeader::hton()
+void RdtHeader::hton()
 {
 	m_SeqNumber = htons(m_SeqNumber);
 	m_Reserved = htons(m_Reserved);
@@ -814,7 +812,7 @@ void RdpHeader::hton()
 	m_Flags = htons(m_Flags);
 }
 
-void RdpHeader::ntoh()
+void RdtHeader::ntoh()
 {
 	m_SeqNumber = ntohs(m_SeqNumber);
 	m_Reserved = ntohs(m_Reserved);

@@ -1,9 +1,8 @@
 // File: client.cpp
 // Description: Source code for the Project2 client application
 
-#include "rdp.h"
+#include "rdt.h"
 #include <netdb.h>
-#include "Error.h"
 #include <iostream>
 
 using namespace std;
@@ -19,7 +18,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	RdpConnection server;
+	RdtConnection server;
 	if(server.Initialize())
 	{
 		ERROR(ERR_SOCKET, true);
@@ -64,5 +63,5 @@ int main(int argc, char **argv)
 void printHelp(char **argv)
 {
 	cout << "usage: " << argv[0] << " serverName serverPort fileName\n\n";
-	cout << "Runs the rdp (reliable data protocol) client, connects to serverName:serverPort, and requests the specified file.\n";
+	cout << "Runs the rdt (reliable data protocol) client, connects to serverName:serverPort, and requests the specified file.\n";
 }
